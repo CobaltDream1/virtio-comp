@@ -48,35 +48,12 @@ static void virtcrypto_set_affinity(struct virtio_comp *vcompress)
 	vcompress->affinity_hint_set = true;
 }
 
-static int virtcomp_start_comp_engines(struct virtio_comp *vcompress)
-{
-	int32_t i;
-	int ret;
-
-	for (i = 0; i < vcompress->max_data_queues; i++) {
-		if (vcompress->data_vq[i].engine) {
-			ret = crypto_engine_start(vcompress->data_vq[i].engine);
-			if (ret)
-				goto err;
-		}
-	}
-
-	return 0;
-
-err:
-	while (--i >= 0)
-		if (vcompress->data_vq[i].engine)
-			crypto_engine_exit(vcompress->data_vq[i].engine);
-
-	return ret;
-}
-
 static int virtcomp_update_status(struct virtio_comp *vcompress)
 {
 	u32 status;
 	int err;
 
-	virtio_cread_le(vcompress->vdev,
+	virtio_cread(vcompress->vdev,
 			struct virtio_comp_config, status, &status);
 
 	/*
@@ -97,43 +74,25 @@ static int virtcomp_update_status(struct virtio_comp *vcompress)
 	vcompress->status = status;
 
 	if (vcompress->status & VIRTIO_COMP_S_HW_READY) {
-		err = virtcomp_dev_start(vcompress);
-		if (err) {
-			dev_err(&vcompress->vdev->dev,
-				"Failed to start virtio compress device.\n");
+		// err = virtcomp_dev_start(vcompress);
+		// if (err) {
+		// 	dev_err(&vcompress->vdev->dev,
+		// 		"Failed to start virtio compress device.\n");
 
-			return -EPERM;
-		}
+		// 	return -EPERM;
+		// }
 		dev_info(&vcompress->vdev->dev, "Accelerator device is ready\n");
 	} else {
-		virtcomp_dev_stop(vcompress);
+		// virtcomp_dev_stop(vcompress);
 		dev_info(&vcompress->vdev->dev, "Accelerator is not ready\n");
 	}
 
 	return 0;
 }
 
-static void virtcomp_clear_comp_engines(struct virtio_comp *vcompress)
-{
-	u32 i;
-
-	for (i = 0; i < vcompress->max_data_queues; i++)
-		if (vcompress->data_vq[i].engine)
-			crypto_engine_exit(vcompress->data_vq[i].engine);
-}
-
 static void virtcomp_free_queues(struct virtio_comp *vi)
 {
 	kfree(vi->data_vq);
-}
-
-static void virtcomp_clear_crypto_engines(struct virtio_comp *vcompress)
-{
-	u32 i;
-
-	for (i = 0; i < vcompress->max_data_queues; i++)
-		if (vcompress->data_vq[i].engine)
-			crypto_engine_exit(vcompress->data_vq[i].engine);
 }
 
 static void virtcomp_del_vqs(struct virtio_comp *vcompress)
@@ -177,7 +136,7 @@ static int virtcomp_find_vqs(struct virtio_comp *vi)
 	int ret = -ENOMEM;
 	int i, total_vqs;
 	const char **names;
-	struct device *dev = &vi->vdev->dev;
+	// struct device *dev = &vi->vdev->dev;
 
 	/*
 	 * We expect 1 data virtqueue, followed by
@@ -218,12 +177,6 @@ static int virtcomp_find_vqs(struct virtio_comp *vi)
 	for (i = 0; i < vi->max_data_queues; i++) {
 		spin_lock_init(&vi->data_vq[i].lock);
 		vi->data_vq[i].vq = vqs[i];
-		/* Initialize comp engine */
-		vi->data_vq[i].engine = crypto_engine_alloc_init(dev, 1);
-		if (!vi->data_vq[i].engine) {
-			ret = -ENOMEM;
-			goto err_engine;
-		}
 	}
 
 	kfree(names);
@@ -232,7 +185,6 @@ static int virtcomp_find_vqs(struct virtio_comp *vi)
 
 	return 0;
 
-err_engine:
 err_find:
 	kfree(names);
 err_names:
@@ -312,24 +264,24 @@ static int virtio_comp_probe(struct virtio_device *vdev)
 	if (!vcompress)
 		return -ENOMEM;
 
-	virtio_cread_le(vdev, struct virtio_comp_config,
+	virtio_cread(vdev, struct virtio_comp_config,
 			max_dataqueues, &max_data_queues);
 	if (max_data_queues < 1)
 		max_data_queues = 1;
 
-	virtio_cread_le(vdev, struct virtio_comp_config,
+	virtio_cread(vdev, struct virtio_comp_config,
 			comp_algo, &comp_algo);
-	virtio_cread_le(vdev, struct virtio_comp_config,
+	virtio_cread(vdev, struct virtio_comp_config,
 			max_size, &max_size);
-	virtio_cread_le(vdev, struct virtio_comp_config,
+	virtio_cread(vdev, struct virtio_comp_config,
 			hash_algo, &hash_algo);
 
 	/* Add virtio comp device to global table */
-	err = virtcomp_devmgr_add_dev(vcompress);
-	if (err) {
-		dev_err(&vdev->dev, "Failed to add new virtio comp device.\n");
-		goto free;
-	}
+	// err = virtcomp_devmgr_add_dev(vcompress);
+	// if (err) {
+	// 	dev_err(&vdev->dev, "Failed to add new virtio comp device.\n");
+	// 	goto free;
+	// }
 	vcompress->owner = THIS_MODULE;
 	vcompress = vdev->priv = vcompress;
 	vcompress->vdev = vdev;
@@ -355,26 +307,20 @@ static int virtio_comp_probe(struct virtio_device *vdev)
 		goto free_dev;
 	}
 
-	err = virtcomp_start_comp_engines(vcompress);
-	if (err)
-		goto free_vqs;
-
 	virtio_device_ready(vdev);
 
 	err = virtcomp_update_status(vcompress);
 	if (err)
-		goto free_engines;
+		goto free_vqs;
 
 	return 0;
 
-free_engines:
-	virtcomp_clear_comp_engines(vcompress);
 free_vqs:
 	vcompress->vdev->config->reset(vdev);
 	virtcomp_del_vqs(vcompress);
 free_dev:
-	virtcomp_devmgr_rm_dev(vcompress);
-free:
+	// virtcomp_devmgr_rm_dev(vcompress);
+// free:
 	kfree(vcompress);
 	return err;
 }
@@ -399,13 +345,12 @@ static void virtio_comp_remove(struct virtio_device *vdev)
 
 	dev_info(&vdev->dev, "Start virtcrypto_remove.\n");
 
-	if (virtcomp_dev_started(vcompress))
-		virtcomp_dev_stop(vcompress);
+	// if (virtcomp_dev_started(vcompress))
+	// 	virtcomp_dev_stop(vcompress);
 	vdev->config->reset(vdev);
 	virtcomp_free_unused_reqs(vcompress);
-	virtcomp_clear_crypto_engines(vcompress);
 	virtcomp_del_vqs(vcompress);
-	virtcomp_devmgr_rm_dev(vcompress);
+	// virtcomp_devmgr_rm_dev(vcompress);
 	kfree(vcompress);
 }
 

@@ -82,28 +82,6 @@ struct virtio_comp_request {
 	virtio_comp_data_callback alg_cb;
 };
 
-int virtcomp_devmgr_add_dev(struct virtio_comp *vcomp_dev);
-struct list_head *virtcomp_devmgr_get_head(void);
-void virtcomp_devmgr_rm_dev(struct virtio_comp *vcomp_dev);
-struct virtio_comp *virtcomp_devmgr_get_first(void);
-int virtcomp_dev_in_use(struct virtio_comp *vcomp_dev);
-int virtcomp_dev_get(struct virtio_comp *vcomp_dev);
-void virtcomp_dev_put(struct virtio_comp *vcomp_dev);
-int virtcomp_dev_started(struct virtio_comp *vcomp_dev);
-bool virtcomp_algo_is_supported(struct virtio_comp *vcomp_dev,
-				  uint32_t service,
-				  uint32_t algo);
-struct virtio_comp *virtcomp_get_dev_node(int node,
-					      uint32_t service,
-					      uint32_t algo);
-int virtcomp_dev_start(struct virtio_comp *vcomp);
-void virtcomp_dev_stop(struct virtio_comp *vcomp);
-int virtio_comp_skcipher_crypt_req(
-	struct crypto_engine *engine, void *vreq);
-
-void
-virtcomp_clear_request(struct virtio_comp_request *vc_req);
-
 static inline int virtio_comp_get_current_node(void)
 {
 	int cpu, node;
@@ -114,8 +92,5 @@ static inline int virtio_comp_get_current_node(void)
 
 	return node;
 }
-
-int virtio_comp_algs_register(struct virtio_comp *vcomp);
-void virtio_comp_algs_unregister(struct virtio_comp *vcomp);
 
 #endif /* _VIRTIO_COMP_COMMON_H */
